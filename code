@@ -1,0 +1,530 @@
+#include <bits/stdc++.h>
+using namespace std;
+
+class task {
+public:
+    int id;
+    string heading;
+    string desc;
+    int priority;
+
+    task(string heading, string desc, int priority, int& tidno) {
+        this->heading = heading;
+        this->desc = desc;
+        this->priority = priority;
+        this->id = ++tidno;
+    }
+};
+
+struct comparetask {
+    bool operator()(task& t1, task& t2) {
+        return t1.priority > t2.priority;
+    }
+};
+
+class employee {
+public:
+    employee* under;
+    int id;
+    string password;
+    int salary;
+    int accbal;
+    int score;
+    bool salcredited;
+    string name;
+    string designation;
+    vector<string> messages;
+    vector<employee*> subordinates;  // Store pointers to subordinates
+    priority_queue<task, vector<task>, comparetask> tasks;
+
+    void viewmessages() {
+        for (auto it : messages) cout << it << endl;
+    }
+
+    void viewaccbal() {
+        cout << "Your account balance is " + to_string(accbal) << endl;
+    }
+
+    void viewsubs() {
+        for (auto it : subordinates) {
+            cout << it->name + " (" + to_string(it->id) + ") (" + it->designation + ")" << endl;
+        }
+    }
+
+    void addsub(employee* newsub) {
+        subordinates.push_back(newsub);
+        newsub->under = this;
+        messages.push_back("A new subordinate is added under you, his name is " + newsub->name + " with id " + to_string(newsub->id) + ".");
+        for (auto it : subordinates) {
+            if (it->id != newsub->id) it->messages.push_back("A new member is added in your team, his name is " + newsub->name + " with id " + to_string(newsub->id) + ".");
+            else it->messages.push_back("You have been added to the team under " + name + " with id " + to_string(id));
+        }
+    }
+    
+void removesub(employee* sub) {
+    vector<employee*> newsubs;
+    
+    for(auto it:subordinates){
+        if(it->id!=sub->id) newsubs.push_back(it);
+        else{
+            for(auto i:(it)->subordinates) newsubs.push_back(i);
+            while(!(it->tasks).empty()){
+                this->tasks.push((it)->tasks.top());
+                (it)->tasks.pop();
+            }
+        }
+    }
+    subordinates=newsubs;
+
+    sub->messages.push_back("You have been removed from your current team. Stay connected, we will allot you a new team soon.");
+    messages.push_back("Your subordinate " + sub->name + " with id " + to_string(sub->id) + " has been removed from your team.");
+}
+
+
+    void creditsalary(int& amount, bool& b) {
+        if (amount < salary) { b = false; return; }
+        if (salcredited == false) {
+            accbal += salary;
+            salcredited = true;
+            messages.push_back("Salary Credited. Account balance is " + to_string(accbal));
+            amount -= salary;
+        }
+        for (auto it : subordinates) {
+            it->creditsalary(amount, b);
+        }
+    }
+
+    void message(string to, string msg) {
+        if (to == "all") {
+            for (auto it : subordinates) {
+                it->messages.push_back(msg);
+                message(to, msg);
+            }
+        }
+        else {
+            if (designation == to) {
+                messages.push_back(msg);
+                return;
+            }
+            for (auto it : subordinates) it->message(to, msg);
+        }
+    }
+
+    employee() {}
+
+    employee(employee* under, int sal, int& idno, string name, string des, string pass, unordered_map<int, employee*>& empp) {
+        idno++;
+        this->under = under;
+        this->id = idno;
+        this->name = name;
+        this->salary = sal;
+        this->salcredited = false;
+        this->score = 0;
+        this->designation = des;
+        this->password = pass;
+        this->accbal = 0;
+        this->messages = {};
+        this->subordinates = {};
+        empp[idno] = this;
+    }
+
+    void complain(string comp) {
+        under->messages.push_back("Complaint from " + name + " with id " + to_string(id) + ": " + comp);
+    }
+
+    bool login(employee*& curr, int id, string pass,unordered_map<int, employee*>& empmap) {
+        for(auto it:empmap){
+            if(it.first==id){
+                if(it.second->password==pass) { curr = it.second; return 1; }
+                return 0;
+            }
+        }
+        return 0;
+    }
+
+    void assigntask(task t) {
+        tasks.push(t);
+    }
+
+    bool assigntosub(int id, task t) {
+        for (auto it : subordinates) {
+            if (it->id == id) {
+                it->assigntask(t);
+                return 1;
+            }
+            if (it->assigntosub(id, t))  return 1;
+        }
+        return 0;
+    }
+
+    void showtasks() {
+        while (!tasks.empty()) {
+            task t = tasks.top();
+            tasks.pop();
+            cout << "ID: " << t.id << " " << t.heading << endl;
+            cout << "Needs to be in completed in next " << t.priority << " days." << endl;
+            cout << t.desc << endl;
+            cout << endl;
+        }
+    }
+
+    void completetask(int id) {
+        priority_queue<task, vector<task>, comparetask> task;
+        while (!tasks.empty()) {
+            if (tasks.top().id != id) task.push(tasks.top());
+            else {
+                score += 10;
+                under->messages.push_back("your subordinate " + name + " with id " + to_string(id) + " has completed the task of " + tasks.top().heading + " with task id " + to_string(tasks.top().id) + ".");
+            }
+            tasks.pop();
+        }
+        tasks = task;
+    }
+
+    void quittask(int id) {
+        priority_queue<task, vector<task>, comparetask> task;
+        while (!tasks.empty()) {
+            if (tasks.top().id != id) task.push(tasks.top());
+            else {
+                score -= 15;
+                under->tasks.push(tasks.top());
+                under->messages.push_back("your subordinate " + name + " with id " + to_string(id) + " has left the task of " + tasks.top().heading + " with task id " + to_string(tasks.top().id) + ", so it has been added to your tasks.");
+            }
+            tasks.pop();
+        }
+        tasks = task;
+    }
+
+    void assignmytasktosub(int subid, int tid) {
+        priority_queue<task, vector<task>, comparetask> temptask;
+        bool b = false;
+        task t("", "", 0, tid);
+        while (!tasks.empty()) {
+            if (tasks.top().id != tid) temptask.push(tasks.top());
+            else {
+                t = tasks.top();
+                b = true;
+            }
+            tasks.pop();
+        }
+        tasks = temptask;
+        if (b == false) return;
+        for (auto it : subordinates) {
+            if (it->id == subid) it->assigntask(t);
+        }
+    }
+
+    void empofthemonth(vector<employee*>& emp) {
+        if (id!=1 && emp.size() > 0 && score > emp[0]->score) {
+            emp = {};
+            emp.push_back(this);
+        }
+        else if (id!=1 && (emp.size() == 0 || score == emp[0]->score)) emp.push_back(this);
+        for (auto it : subordinates) it->empofthemonth(emp);
+    }
+
+    void reward(unordered_map<int, bool>& isfree,unordered_map<int, employee*>& empmap) {
+        int mx=0;
+        for(auto it:isfree){
+            if(it.second==0) continue;
+            mx=max(mx,empmap[it.first]->score);
+        }
+        vector<employee*> emp;
+        for(auto it:empmap){
+            if(it.second->score==mx) emp.push_back(it.second);
+        }
+        this->empofthemonth(emp);
+        string msg = "";
+        if (emp.size() == 1) {
+            if(emp[0]->id==1) return;
+            emp[0]->salary += (emp[0]->salary * (5 / 100));
+            msg = "Congratulations to " + emp[0]->name + " (" + to_string(emp[0]->id) + ") for being awarded Employee of the month.";
+            cout << "EMPLOYEE OF THE MONTH:" + emp[0]->name << endl;
+        }
+        else {
+            string empnames = "";
+            for (int i = 0; i < emp.size(); i++) {
+                if(emp[i]->id==1)continue;
+                emp[i]->salary += (emp[i]->salary * (5 / 100));
+                empnames += emp[i]->name + " (" + to_string(emp[i]->id) + ") ,";
+            }
+            cout << "EMPLOYEES OF THE MONTH:" + empnames << endl;
+            empnames.pop_back();
+            msg = "Congratulations to " + empnames + "for being awarded Employee of the month.";
+        }
+        this->message("all", msg);
+    }
+
+    void monthend() {
+        this->score = 0;
+        salcredited = 0;
+        for (auto it : subordinates) it->monthend();
+    }
+
+    void viewfullteam() {
+        cout << this->name + " (" + to_string(this->id) + ") ->" + to_string(this->subordinates.size()) + " SUBORDINATES :" << endl;
+        for (auto it : subordinates) cout << "    " + it->name + " (" + to_string(it->id) + ") (" + it->designation + ")" << endl;
+        for (auto& it : subordinates) it->viewfullteam();
+    }
+};
+
+int main() {
+    int taskid = 0;
+    int emid = 0;
+    int fund = 0;
+
+    unordered_map<int, employee*> empmap;
+    unordered_map<int, bool> isfree;
+    employee none;
+    employee* admin = new employee(&none, 0, emid, "admin", "admin", "55735573", empmap);
+    employee* self = &none;
+    cout << "WELCOME TO OUR OFFICE MANAGEMENT SYSTEM!" << endl;
+    int choice = 0;
+    int turns = 0;
+    while (choice != -1 && turns < 100) {
+        turns++;
+        cout << string(75, '-') << endl;
+        if (self == &none) {
+            cout << "PLEASE LOGIN TO ACCESS THE PLATFORM OR PUT ID AS -1 TO EXIT" << endl;
+            cout << "ENTER YOUR ID" << endl;
+            int idd;
+            cin >> idd;
+            if (idd == -1) return 0;
+            cout << "ENTER YOUR PASSWORD" << endl;
+            string passwordd;
+            cin >> passwordd;
+            if (admin->login(self, idd, passwordd,empmap) == 0) {
+                cout << "INVALID CREDINTIALS" << endl;
+                continue;
+            }
+            cout << "LOGIN SUCCESSFUL!" << endl;
+        }
+        cout << "HELLO " + self->name + "!" << endl;
+
+        cout << "PRESS APPROPRIATE KEY:" << endl;
+        cout << "1 TO VIEW TASKS" << endl;
+        cout << "2 To VIEW MESSAGES" << endl;
+        cout << "3 TO VIEW BALANCE" << endl;
+        cout << "4 TO MARK A TASK COMPLETED" << endl;
+        cout << "5 to QUIT A TASK" << endl;
+        cout << "6 TO MESSAGE YOUR SUBORDINATES" << endl;
+        cout << "7 TO SEND A COMPLAIN TO YOUR SUPERVISOR" << endl;
+        cout << "8 TO ASSIGN A NEW TASK TO YOUR SUBORDINATE" << endl;
+        cout << "9 TO ASSIGN ONE OF YOUR TASK TO YOU SUBORDINATE" << endl;
+        cout << "10 TO VIEW YOUR SUBORDINATES" << endl;
+        cout << "0 TO LOGOUT" << endl;
+        cout << "-2 TO VISIT ADMIN DASHBOARD" << endl;
+        cout << "-1 TO EXIT" << endl;
+        cin >> choice;
+        if (choice == -1) return 0;
+
+        if (choice == 1) self->showtasks();
+        if (choice == 2) self->viewmessages();
+        if (choice == 3) self->viewaccbal();
+        if (choice == 4) {
+            cout << "PRESS 1 TO VIEW TASK LIST AND PRESS 0 IF YOU KNOW THE TASK ID OF THE TASK YOU WANT TO COMPLETE." << endl;
+            bool bc;
+            cin >> bc;
+            if (bc) self->showtasks();
+            cout << "ENTER THE ID OF THE TASK YOU WANT TO COMPLETE." << endl;
+            int taskkid;
+            cin >> taskkid;
+            self->completetask(taskkid);
+        }
+        if (choice == 5) {
+            cout << "PRESS 1 TO VIEW TASK LIST AND PRESS 0 IF YOU KNOW THE TASK ID OF THE TASK YOU WANT TO QUIT." << endl;
+            bool bc;
+            cin >> bc;
+            if (bc) self->showtasks();
+            cout << "ENTER THE ID OF THE TASK YOU WANT TO QUIT." << endl;
+            int taskkid;
+            cin >> taskkid;
+            self->quittask(taskkid);
+        }
+        if (choice == 6) {
+            string to;
+            string msgg;
+            cout << "IF YOU WANT TO SEND A MESSAGE TO ALL YOUR SUBORDIATES PRESS 1 ELSE PLESS THE DESIGNATION OF THE SUBORDINATES YOU WANT TO MESSAGE" << endl;
+            cin >> to;
+            if (to == "1") to = "all";
+            cout << "WRITE DOWN YOUR MESSAGE." << endl;
+            cin >> msgg;
+            self->message(to, msgg);
+        }
+        if (choice == 7) {
+            cout << "WRITE DOWN YOUR COMPLAIN." << endl;
+            string comp;
+            cin >> comp;
+            self->complain(comp);
+        }
+        if (choice == 8) {
+            string head, desc;
+            cout << "ENTER TASK DETAILS" << endl;
+            cout << "WRITE HEADING" << endl;
+            cin >> head;
+            cout << "WRITE DESCRIPTION" << endl;
+            cin >> desc;
+            cout << "IN NEXT HOW MANY DAYS YOU WANT THE TASK TO BE COMPLETED?" << endl;
+            int dd;
+            cin >> dd;
+            task t1(head, desc, dd, taskid);
+            cout << "IF YOU WANT TO SEE THE LIST OF YOUR SUBORDINATES PRESS 1 AND TO DIRECTLY ENTER THE ID OF THE SUBORDINATE PRESS 0" << endl;
+            bool bg;
+            cin >> bg;
+            if (bg) self->viewsubs();
+            int idd;
+            cout << "ENTER THE ID OF THE SUBORDINATE YOU WANT TO ASSIGN THIS TASK" << endl;
+            cin >> idd;
+            if (self->assigntosub(idd, t1)) {
+                cout << "TASK ASSIGNED SUCCESSFULLY." << endl;
+            }
+            else {
+                cout << "TASK ASSIGN FAILED. PLEASE CHECK SUBORDINATE ID AND TASK DETAILS AGAIN." << endl;
+            }
+        }
+
+        if (choice == 9) {
+            cout << "IF YOU WANT TO SEE THE LIST OF YOUR TASKS PRESS 1 AND TO DIRECTLY ENTER THE ID OF THE SUBORDINATE PRESS 0" << endl;
+            bool bg1;
+            cin >> bg1;
+            if (bg1) self->showtasks();
+            int idd1;
+            cout << "ENTER THE ID OF THE TASK YOU WANT TO ASSIGN" << endl;
+            cin >> idd1;
+
+            cout << "IF YOU WANT TO SEE THE LIST OF YOUR SUBORDINATES PRESS 1 AND TO DIRECTLY ENTER THE ID OF THE SUBORDINATE PRESS 0" << endl;
+            bool bg;
+            cin >> bg;
+            if (bg) self->viewsubs();
+            int idd;
+            cout << "ENTER THE ID OF THE SUBORDINATE YOU WANT TO ASSIGN THIS TASK" << endl;
+            cin >> idd;
+            self->assignmytasktosub(idd, idd1);
+        }
+        if (choice == 10) self->viewsubs();
+        if (choice == 0) {
+            self = &none;
+        }
+
+        if (choice == -2) {
+            if (self != admin) {
+                cout << "LOG IN WITH ADMIN ID TO ACCESS ADMIN DASHBOARD." << endl;
+            }
+            else {
+                int ch;
+                cout << "WELCOME TO ADMIN DASHBOARD" << endl;
+                cout << "PRESS APPROPRIATE KEY:" << endl;
+                cout << "1 TO VIEW FULL TEAM" << endl;
+                cout << "2 TO CREDIT SALARIES FROM FUND" << endl;
+                cout << "3 TO VIEW FULL FUND" << endl;
+                cout << "4 TO END THIS MONTH" << endl;
+                cout << "5 TO REMOVE AN EMPLOYEE FROM A TEAM" << endl;
+                cout << "6 TO ADD AN EMPLOYEE TO A TEAM" << endl;
+                cout << "7 TO VIEW FREE EMPLOYEES WHO ARE NOT IN A TEAM CURRENTLY" << endl;
+                cout << "8 TO CREATE A NEW EMPLOYEE" << endl;
+                cin >> ch;
+                if (ch == 1) {
+                    self->viewfullteam();
+                    cout << "FREE EMPLOYEES:" << endl;
+                    for (auto it : isfree) {
+                        if(it.second==0) continue;
+                        cout << empmap[it.first]->name + " (" + to_string(empmap[it.first]->id) + ")" << endl;
+                    }
+                }
+                if (ch == 2) {
+                    bool bb = true;
+                    self->creditsalary(fund, bb);
+                    if (bb == false) {
+                        cout << "FUNDS ARE NOT COMPLETE TO CREDIT THE SALARIES, BUT WE HAVE CREDITED SALARIES TO THE EMPLOYEES FOR WHOM IT WAS POSSIBLE." << endl;
+                    }
+                    else cout << "SALARIES CREDITED SUCCESSFULLY" << endl;
+                }
+
+                if (ch == 3) {
+                    cout << "AVAILABLE FUND: " + to_string(fund) << endl;
+                }
+                if (ch == 4) {
+                    self->monthend();
+                    cout << "MONTH ENDED!" << endl;
+                    self->reward(isfree,empmap);
+                    self->monthend();
+                    cout << "5% SALARY HIKE PROVIDED TO THEM." << endl;
+                }
+                if (ch == 5) {
+                    bool bb;
+                    cout << "PRESS 1 IF YOU WANT TO VIEW THE TEAM STRUCTURE AND ELSE PRESS 0." << endl;
+                    cin >> bb;
+                    if (bb) {
+                        self->viewfullteam();
+                        cout << "FREE EMPLOYEES:" << endl;
+                         for (auto it : isfree) {
+                        if(it.second==0) continue;
+                         cout << empmap[it.first]->name + " (" + to_string(empmap[it.first]->id) + ") (" + empmap[it.first]->designation + ")" << endl;
+                    }
+                    }
+                    cout << "ENTER THE ID OF THE TEAM HEAD WHOSE SUBORDINATE YOU WANT TO REMOVE" << endl;
+                    int hid, sid;
+                    cin >> hid;
+                    cout << "ENTER SUBORDINATE ID" << endl;
+                    cin >> sid;
+                    empmap[hid]->removesub(empmap[sid]);
+                    isfree[sid] = 1;
+                }
+
+                if (ch == 6) {
+                    bool bb;
+                    cout << "PRESS 1 IF YPU WANT TO VIEW THE TEAM STRUCTURE AND ELSE PRESS 0." << endl;
+                    cin >> bb;
+                    if (bb) {
+                        self->viewfullteam();
+                        cout << "FREE EMPLOYEES:" << endl;
+                        for (auto it : isfree) {
+                        if(it.second==0) continue;
+                         cout << empmap[it.first]->name + " (" + to_string(empmap[it.first]->id) + ") (" + empmap[it.first]->designation + ")" << endl;
+                    }
+                    }
+                    cout << "ENTER THE ID OF THE TEAM HEAD WHOSE SUBORDINATE YOU WANT TO ADD" << endl;
+                    int hid, sid;
+                    cin >> hid;
+                    cout << "ENTER SUBORDINATE ID" << endl;
+                    cin >> sid;
+                    if (isfree[sid] == 0) {
+                        cout << "THE DESIRED SUBORDINATE IS ALREADY WORKING IN A TEAM, FIRST REMOVE HIM FROM THERE IN ORDER TO ADD HIM IN A NEW TEAM." << endl;
+                    }
+                    else empmap[hid]->addsub(empmap[sid]);
+                    isfree[sid] = 0;
+                }
+                if (ch == 7) {
+                    cout << "FREE EMPLOYEES:" << endl;
+                    for (auto it : isfree) {
+                        if(it.second==0) continue;
+                         cout << empmap[it.first]->name + " (" + to_string(empmap[it.first]->id) + ") (" + empmap[it.first]->designation + ")" << endl;
+                    }
+                }
+                if (ch == 8) {
+                    int sal;
+                    string name, desig, pass;
+                    cout << "ENTER EMPLOYEE NAME" << endl;
+                    cin >> name;
+                    cout << "ENTER DESIGNATION" << endl;
+                    cin >> desig;
+                    cout << "ENTER SALARY" << endl;
+                    cin >> sal;
+                    cout << "GENERATE PASSWORD" << endl;
+                    cin >> pass;
+                    employee* e = new employee(&none, sal, emid, name, desig, pass, empmap);
+                    empmap[e->id] = e;
+                    isfree[e->id] = 1;
+                }
+            }
+        }
+
+        cout << "OPERATIONS DONE SUCCESSFULLY!" << endl;
+        cout << "PRESS 1 TO GO TO DASHBOARD AND 0 TO EXIT" << endl;
+        bool bbb;
+        cin >> bbb;
+        if (!bbb) return 0;
+    }
+
+    return 0;
+}
